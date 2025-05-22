@@ -1,0 +1,130 @@
+name: Provision S3 Bucket
+
+on:
+  repository_dispatch:
+    types: [provision-s3-bucket]
+
+env:
+  TF_VAR_bucket_prefix: ${{ github.event.client_payload.bucket_prefix }}
+  TF_VAR_environment: ${{ github.event.client_payload.environment }}
+  TF_VAR_purpose: ${{ github.event.client_payload.purpose }}
+  TF_VAR_enable_versioning: ${{ github.event.client_payload.enable_versioning }}
+  PORT_RUN_ID: ${{ github.event.client_payload.port_context.runId }}
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.6.0
+        terraform_wrapper: false
+
+    - name: Update Port - Starting Provisioning
+      uses: port-labs/port-github-action@v1
+      with:
+        clientId: ${{ secrets.PORT_CLIENT_ID }}
+        clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+        operation: PATCH_RUN
+        runId: ${{ env.PORT_RUN_ID }}
+        logMessage: "Starting S3 bucket provisioning with Terraform..."
+
+    - name: Terraform Init
+      working-directory: ./terraform
+      run: |
+        terraform init
+        
+    - name: Terraform Plan
+      id: plan
+      working-directory: ./terraform
+      run: |
+        terraform plan -out=tfplan
+        terraform show -no-color tfplan > plan.txt
+        echo "plan_output<<EOF" >> $GITHUB_OUTPUT
+        cat plan.txt >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Update Port - Plan Complete
+      uses: port-labs/port-github-action@v1
+      with:
+        clientId: ${{ secrets.PORT_CLIENT_ID }}
+        clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+        operation: PATCH_RUN
+        runId: ${{ env.PORT_RUN_ID }}
+        logMessage: |
+          Terraform plan complete. Resources to be created:
+          ```
+          ${{ steps.plan.outputs.plan_output }}
+          ```
+
+    - name: Terraform Apply
+      id: apply
+      working-directory: ./terraform
+      run: |
+        terraform apply -auto-approve tfplan
+        echo "bucket_name=$(terraform output -raw bucket_name)" >> $GITHUB_OUTPUT
+        echo "bucket_arn=$(terraform output -raw bucket_arn)" >> $GITHUB_OUTPUT
+        echo "bucket_url=$(terraform output -raw bucket_url)" >> $GITHUB_OUTPUT
+
+    - name: Create Port Entity
+      uses: port-labs/port-github-action@v1
+      with:
+        clientId: ${{ secrets.PORT_CLIENT_ID }}
+        clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+        operation: UPSERT
+        identifier: ${{ steps.apply.outputs.bucket_name }}
+        blueprint: s3Bucket
+        properties: |
+          {
+            "name": "${{ steps.apply.outputs.bucket_name }}",
+            "environment": "${{ env.TF_VAR_environment }}",
+            "purpose": "${{ env.TF_VAR_purpose }}",
+            "versioning_enabled": ${{ env.TF_VAR_enable_versioning }},
+            "arn": "${{ steps.apply.outputs.bucket_arn }}",
+            "url": "${{ steps.apply.outputs.bucket_url }}",
+            "created_by": "${{ github.event.client_payload.port_context.user }}",
+            "region": "${{ secrets.AWS_REGION }}"
+          }
+
+    - name: Update Port - Success
+      uses: port-labs/port-github-action@v1
+      with:
+        clientId: ${{ secrets.PORT_CLIENT_ID }}
+        clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+        operation: PATCH_RUN
+        runId: ${{ env.PORT_RUN_ID }}
+        logMessage: |
+          ✅ S3 bucket provisioned successfully!
+          
+          **Bucket Details:**
+          - Name: ${{ steps.apply.outputs.bucket_name }}
+          - ARN: ${{ steps.apply.outputs.bucket_arn }}
+          - URL: ${{ steps.apply.outputs.bucket_url }}
+          - Environment: ${{ env.TF_VAR_environment }}
+
+    - name: Update Port - Failure
+      if: failure()
+      uses: port-labs/port-github-action@v1
+      with:
+        clientId: ${{ secrets.PORT_CLIENT_ID }}
+        clientSecret: ${{ secrets.PORT_CLIENT_SECRET }}
+        operation: PATCH_RUN
+        runId: ${{ env.PORT_RUN_ID }}
+        logMessage: |
+          ❌ S3 bucket provisioning failed!
+          
+          Please check the GitHub Actions logs for details.
+          
+          Run ID: ${{ github.run_id }}

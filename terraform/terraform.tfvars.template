@@ -1,0 +1,10 @@
+# AWS Configuration
+aws_region = "us-east-1"
+
+# Default tags applied to all resources
+default_tags = {
+  Environment = "demo"
+  Project     = "port-s3-provisioner"
+  ManagedBy   = "terraform"
+  Owner       = "platform-team"
+}

@@ -1,0 +1,71 @@
+{
+  "identifier": "s3Bucket",
+  "title": "S3 Bucket",
+  "icon": "Bucket",
+  "schema": {
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Bucket Name",
+        "description": "The name of the S3 bucket"
+      },
+      "environment": {
+        "type": "string",
+        "title": "Environment",
+        "enum": ["dev", "staging", "prod"],
+        "enumColors": {
+          "dev": "lightGray",
+          "staging": "orange",
+          "prod": "red"
+        }
+      },
+      "purpose": {
+        "type": "string",
+        "title": "Purpose",
+        "description": "The purpose or use case for this bucket"
+      },
+      "versioning_enabled": {
+        "type": "boolean",
+        "title": "Versioning Enabled",
+        "description": "Whether versioning is enabled on this bucket"
+      },
+      "arn": {
+        "type": "string",
+        "title": "ARN",
+        "description": "The Amazon Resource Name of the bucket"
+      },
+      "url": {
+        "type": "string",
+        "title": "URL",
+        "format": "url",
+        "description": "The URL of the S3 bucket"
+      },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "AWS region where the bucket is located"
+      },
+      "created_by": {
+        "type": "string",
+        "title": "Created By",
+        "description": "User who created this bucket"
+      }
+    },
+    "required": ["name", "environment", "arn", "region"]
+  },
+  "mirrorProperties": {},
+  "calculationProperties": {
+    "aws_console_url": {
+      "title": "AWS Console URL",
+      "calculation": "\"https://s3.console.aws.amazon.com/s3/buckets/\" + .properties.name",
+      "type": "string",
+      "format": "url"
+    },
+    "estimated_monthly_cost": {
+      "title": "Est. Monthly Cost",
+      "calculation": "if .properties.environment == \"prod\" then \"$20-100\" elif .properties.environment == \"staging\" then \"$5-25\" else \"$1-10\" end",
+      "type": "string"
+    }
+  },
+  "relations": {}
+}

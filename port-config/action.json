@@ -1,0 +1,79 @@
+{
+  "identifier": "provision_s3_bucket",
+  "title": "Provision S3 Bucket",
+  "icon": "Bucket",
+  "description": "Create a new S3 bucket with proper configuration and security settings",
+  "trigger": {
+    "type": "self-service",
+    "operation": "CREATE",
+    "userInputs": {
+      "properties": {
+        "bucket_prefix": {
+          "title": "Bucket Name Prefix",
+          "type": "string",
+          "description": "Prefix for the bucket name (lowercase, alphanumeric, hyphens only)",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "minLength": 3,
+          "maxLength": 20
+        },
+        "environment": {
+          "title": "Environment",
+          "type": "string",
+          "enum": [
+            "dev",
+            "staging",
+            "prod"
+          ],
+          "enumColors": {
+            "dev": "lightGray",
+            "staging": "orange",
+            "prod": "red"
+          },
+          "description": "Target environment for the bucket"
+        },
+        "purpose": {
+          "title": "Purpose",
+          "type": "string",
+          "description": "Describe what this bucket will be used for",
+          "default": "Data storage and processing"
+        },
+        "enable_versioning": {
+          "title": "Enable Versioning",
+          "type": "boolean",
+          "description": "Enable object versioning for this bucket",
+          "default": false
+        }
+      },
+      "required": [
+        "bucket_prefix",
+        "environment",
+        "purpose"
+      ],
+      "order": [
+        "bucket_prefix",
+        "environment",
+        "purpose",
+        "enable_versioning"
+      ]
+    },
+    "blueprintIdentifier": "s3Bucket"
+  },
+  "invocationMethod": {
+    "type": "GITHUB",
+    "org": "jbrcoleman",
+    "repo": "port-demo",
+    "workflow": "provision-s3.yml",
+    "workflowInputs": {
+      "bucket_prefix": "{{ .inputs.bucket_prefix }}",
+      "environment": "{{ .inputs.environment }}",
+      "purpose": "{{ .inputs.purpose }}",
+      "enable_versioning": "{{ .inputs.enable_versioning }}",
+      "port_context": {
+        "runId": "{{ .run.id }}",
+        "user": "{{ .trigger.by.user.email }}"
+      }
+    }
+  },
+  "publish": true,
+  "requiredApproval": false
+}
