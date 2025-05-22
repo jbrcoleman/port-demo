@@ -1,15 +1,40 @@
 name: Provision S3 Bucket
 
 on:
-  repository_dispatch:
-    types: [provision-s3-bucket]
+  workflow_dispatch:
+    inputs:
+      bucket_prefix:
+        description: 'Bucket name prefix'
+        required: true
+        type: string
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      purpose:
+        description: 'Purpose of the bucket'
+        required: true
+        type: string
+      enable_versioning:
+        description: 'Enable versioning'
+        required: false
+        type: boolean
+        default: false
+      port_context:
+        description: 'Port context'
+        required: false
+        type: string
 
 env:
-  TF_VAR_bucket_prefix: ${{ github.event.client_payload.bucket_prefix }}
-  TF_VAR_environment: ${{ github.event.client_payload.environment }}
-  TF_VAR_purpose: ${{ github.event.client_payload.purpose }}
-  TF_VAR_enable_versioning: ${{ github.event.client_payload.enable_versioning }}
-  PORT_RUN_ID: ${{ github.event.client_payload.port_context.runId }}
+  TF_VAR_bucket_prefix: ${{ github.event.inputs.bucket_prefix }}
+  TF_VAR_environment: ${{ github.event.inputs.environment }}
+  TF_VAR_purpose: ${{ github.event.inputs.purpose }}
+  TF_VAR_enable_versioning: ${{ github.event.inputs.enable_versioning }}
+  PORT_RUN_ID: ${{ fromJson(github.event.inputs.port_context).runId }}
 
 jobs:
   provision:
@@ -94,7 +119,7 @@ jobs:
             "versioning_enabled": ${{ env.TF_VAR_enable_versioning }},
             "arn": "${{ steps.apply.outputs.bucket_arn }}",
             "url": "${{ steps.apply.outputs.bucket_url }}",
-            "created_by": "${{ github.event.client_payload.port_context.user }}",
+            "created_by": "${{ fromJson(github.event.inputs.port_context).user }}",
             "region": "${{ secrets.AWS_REGION }}"
           }
 
